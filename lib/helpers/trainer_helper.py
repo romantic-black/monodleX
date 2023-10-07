@@ -56,8 +56,9 @@ class Trainer(object):
             self.gpu_ids = [cfg['gpu_ids']]
         else:
             self.gpu_ids = list(map(int, cfg['gpu_ids'].split(",")))
-        self.model = torch.nn.DataParallel(model, device_ids=self.gpu_ids).to(self.device)
 
+        # self.model = torch.nn.DataParallel(model, device_ids=self.gpu_ids).to(self.device)
+        self.model = model.to(self.device)
 
 
     def train(self):
@@ -106,7 +107,7 @@ class Trainer(object):
             total_loss, stats_batch = compute_centernet3d_loss(outputs, targets)
             total_loss.backward()
             self.optimizer.step()
-            self.update_loss_item(loss_items, stats_batch)
+            self.update_loss_item(loss_items, stats_batch)  # 似乎只用于记录损失
 
             progress_bar.update()
         progress_bar.close()

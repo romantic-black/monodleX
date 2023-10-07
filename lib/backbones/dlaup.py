@@ -147,7 +147,7 @@ class DLAUp(nn.Module):
         super(DLAUp, self).__init__()
         scales_list = np.array(scales_list, dtype=int)
 
-        for i in range(len(in_channels_list) - 1):
+        for i in range(len(in_channels_list) - 1):  # [64, 128, 256, 512]
             j = -i - 2
             setattr(self, 'ida_{}'.format(i), IDAUp(in_channels_list=in_channels_list[j:],
                                                     up_factors_list=scales_list[j:] // scales_list[j],
@@ -158,10 +158,10 @@ class DLAUp(nn.Module):
     def forward(self, layers):
         layers = list(layers)
         assert len(layers) > 1
-        for i in range(len(layers) - 1):
+        for i in range(len(layers) - 1):    # range(0, 3)
             ida = getattr(self, 'ida_{}'.format(i))
             layers[-i - 2:] = ida(layers[-i - 2:])
-        return layers[-1]
+        return layers[-1]   # 4 元素数组，大小都为 [4, 64, 96, 320]
 
 
 class DLAUpv2(nn.Module):

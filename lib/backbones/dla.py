@@ -18,7 +18,7 @@ def conv3x3(in_planes, out_planes, stride=1):
     return nn.Conv2d(in_planes, out_planes, kernel_size=3, stride=stride,
                      padding=1, bias=False)
 
-
+# 与 Bottleneck 类似
 class BasicBlock(nn.Module):
     def __init__(self, inplanes, planes, stride=1, dilation=1):
         super(BasicBlock, self).__init__()
@@ -49,7 +49,7 @@ class BasicBlock(nn.Module):
 
         return out
 
-
+# 传入 DLA 中，和 BottleneckX 类似
 class Bottleneck(nn.Module):
     expansion = 2
 
@@ -90,7 +90,7 @@ class Bottleneck(nn.Module):
 
         return out
 
-
+# 传入 DLA 中
 class BottleneckX(nn.Module):
     expansion = 2
     cardinality = 32
@@ -134,7 +134,7 @@ class BottleneckX(nn.Module):
 
         return out
 
-
+# 给 Tree 使用
 class Root(nn.Module):
     def __init__(self, in_channels, out_channels, kernel_size, residual):
         super(Root, self).__init__()
@@ -155,7 +155,7 @@ class Root(nn.Module):
 
         return x
 
-
+# 给 DLA 使用
 class Tree(nn.Module):
     def __init__(self, levels, block, in_channels, out_channels, stride=1,
                  level_root=False, root_dim=0, root_kernel_size=1,
@@ -310,12 +310,13 @@ class DLA(nn.Module):
         self.fc = fc
 
 
+# 使用的就是这个
 def dla34(pretrained=False, **kwargs):  # DLA-34
     model = DLA([1, 1, 1, 2, 2, 1],
                 [16, 32, 64, 128, 256, 512],
                 block=BasicBlock, **kwargs)
     if pretrained:
-        model.load_pretrained_model(data='imagenet', name='dla34', hash='ba72cf86')
+        model.load_pretrained_model(data='/home/a/monodleX/data/ckpt/', name='dla34-ba72cf86.pth', hash='ba72cf86')
     return model
 
 

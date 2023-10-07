@@ -163,10 +163,10 @@ def _gather_feat(feat, ind, mask=None):
 
     Returns: tensor shaped in B * K or B * sum(mask)
     '''
-    dim  = feat.size(2)  # get channel dim
+    dim  = feat.size(2)  # get channel dim  # 下面进行一个复制
     ind  = ind.unsqueeze(2).expand(ind.size(0), ind.size(1), dim)  # B*len(ind) --> B*len(ind)*1 --> B*len(ind)*C
     feat = feat.gather(1, ind)  # B*(HW)*C ---> B*K*C
-    if mask is not None:
+    if mask is not None:    # False
         mask = mask.unsqueeze(2).expand_as(feat)  # B*50 ---> B*K*1 --> B*K*C
         feat = feat[mask]
         feat = feat.view(-1, dim)
