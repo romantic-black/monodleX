@@ -230,6 +230,8 @@ class KITTI_Dataset(data.Dataset):
         dimension = np.ones((self.max_objs, 3), dtype=np.float32)
         offset_3d = np.zeros((self.max_objs, 2), dtype=np.float32)
         loc_on_ground = np.zeros((self.max_objs, 3), dtype=np.float32)
+        roads = np.zeros((self.max_objs, 4), dtype=np.float32)
+        p2_inv = np.zeros((self.max_objs, 4, 3), dtype=np.float32)
         indices = np.zeros((self.max_objs), dtype=np.int64)
         mask_2d = np.zeros((self.max_objs),
                            dtype=np.int64)  # if you use smaller batch_size, there is a greater probability of nan.
@@ -307,13 +309,12 @@ class KITTI_Dataset(data.Dataset):
             dimension[i] = src_size_3d[i] - mean_size
 
             loc_on_ground[i] = self.put_to_ground(objects[i].pos.reshape(1,-1), road)
-
+            roads[i] = np.array([*road])
+            p2_inv[i] = np.linalg.pinv(calib.P2)
             mask_2d[i] = 1
             mask_3d[i] = 0 if random_crop_flag else 1
 
         # collect return data
-        p2_inv = np.linalg.pinv(calib.P2)
-        road = np.array([*road])
         inputs = img
         targets = {'depth': depth,
                    'size_2d': size_2d,
@@ -329,7 +330,7 @@ class KITTI_Dataset(data.Dataset):
                    'loc_on_ground': loc_on_ground,
                    'mask_2d': mask_2d,
                    'mask_3d': mask_3d,
-                   'road': road,
+                   'road': roads,
                    'p2_inv': p2_inv}
         info = {'img_id': index,
                 'img_size': img_size,
