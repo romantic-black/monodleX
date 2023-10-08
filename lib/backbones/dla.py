@@ -316,7 +316,7 @@ def dla34(pretrained=False, **kwargs):  # DLA-34
                 [16, 32, 64, 128, 256, 512],
                 block=BasicBlock, **kwargs)
     if pretrained:
-        model.load_pretrained_model(data='/home/a/monodleX/data/ckpt/', name='dla34-ba72cf86.pth', hash='ba72cf86')
+        model.load_pretrained_model(data='/root/monodleX/data/ckpt/', name='dla34-ba72cf86.pth', hash='ba72cf86')
     return model
 
 

@@ -28,7 +28,7 @@ class CenterNet3D(nn.Module):
         if cfg['dataset']['type'] == 'KITTI_v2':
             self.consider_outside_objs = True
         # 输出名称: 输出维数
-        self.heads = {'heatmap': num_class, 'offset_2d': 2, 'size_2d' :2,
+        self.heads = {'heatmap': num_class, 'offset_2d': 2,
                       'offset_center': 3, 'offset_3d': 2, 'size_3d':3, 'heading': 24}
 
         self.use_dlaup = True

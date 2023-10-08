@@ -39,7 +39,7 @@ def main():
 
 
     # build dataloader
-    train_loader, test_loader  = build_dataloader(cfg['dataset'])
+    train_loader, test_loader  = build_dataloader(cfg['dataset'], workers=12)
 
     # build model
     model = build_model(cfg)
