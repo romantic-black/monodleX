@@ -30,8 +30,8 @@ def image_point_to_road(road, calib, u, v):  # 输出位于 rect 坐标系
 def decode_detections_(dets, info, calibs, threshold):
     '''
     NOTE: THIS IS A NUMPY FUNCTION
-    input:  #    1         1      3       1      1        3           1    1      24
-            # [cls_ids, scores, size_3d, xs3d, ys3d, offset_center, xs2d, ys2d, heading]
+    input:  #    1         1      3       1      1        3             24
+            # [cls_ids, scores, size_3d, xs3d, ys3d, offset_center,  heading]
     input: info: {img_id:[B], img_size:[B,2], downsample_ratio:[B,2], road:[B,4]}
     calibs: list[B]
     output:
@@ -50,12 +50,12 @@ def decode_detections_(dets, info, calibs, threshold):
             x_rate = info['bbox_downsample_ratio'][i][0]
             y_rate = info['bbox_downsample_ratio'][i][1]
             (h, w, l), xs3d, ys3d = dets[i, j, 2:5], dets[i, j, 5] * x_rate, dets[i, j, 6] * y_rate
-            offset_center, heading = dets[i, j, 7:10], dets[i, j, 12:36]
-            xs2d, ys2d = dets[i, j, 10] * x_rate, dets[i, j, 11] * y_rate
+            offset_center, heading = dets[i, j, 7:10], dets[i, j, 10:34]
 
             location = image_point_to_road(road, calib, xs3d, ys3d) + offset_center    # 中心点地面坐标
+            xs2d, _ = calib.rect_to_img(location.reshape(1, -1))
             alpha = get_heading_angle(heading)
-            ry = calib.alpha2ry(alpha, xs2d)
+            ry = calib.alpha2ry(alpha, xs2d[0, 0])
 
             #### generate 2d bbox using 3d bbox
             x_corners = [l / 2, l / 2, -l / 2, -l / 2, l / 2, l / 2, -l / 2, -l / 2]
@@ -148,7 +148,7 @@ def extract_dets_from_outputs_(outputs, K=50):
     size_3d = outputs['size_3d']
     offset_3d = outputs['offset_3d']
     # size_2d = outputs['size_2d']
-    offset_2d = outputs['offset_2d']
+    # offset_2d = outputs['offset_2d']
     offset_center = outputs['offset_center']
 
     heatmap = torch.clamp(heatmap.sigmoid_(), min=1e-4, max=1 - 1e-4)
@@ -157,15 +157,10 @@ def extract_dets_from_outputs_(outputs, K=50):
     heatmap = _nms(heatmap)
     scores, inds, cls_ids, xs, ys = _topk(heatmap, K=K)
 
-    offset_2d = _transpose_and_gather_feat(offset_2d, inds)  # TODO: 删除 offset 2d
-    offset_2d = offset_2d.view(batch, K, 2)
-    xs2d = xs.view(batch, K, 1) + offset_2d[:, :, 0:1]  # x_c / x_I + offset2d = x_b
-    ys2d = ys.view(batch, K, 1) + offset_2d[:, :, 1:2]
-
     offset_3d = _transpose_and_gather_feat(offset_3d, inds)
     offset_3d = offset_3d.view(batch, K, 2)
-    xs3d = xs2d + offset_3d[:, :, 0:1]  # 接地点坐标
-    ys3d = ys2d + offset_3d[:, :, 1:2]
+    xs3d = xs.view(batch, K, 1) + offset_3d[:, :, 0:1]  # 接地点坐标
+    ys3d = ys.view(batch, K, 1) + offset_3d[:, :, 1:2]
 
     offset_center = _transpose_and_gather_feat(offset_center, inds)
     offset_center = offset_center.view(batch, K, 3)
@@ -175,8 +170,8 @@ def extract_dets_from_outputs_(outputs, K=50):
     size_3d = size_3d.view(batch, K, 3)
     cls_ids = cls_ids.view(batch, K, 1).float()
     scores = scores.view(batch, K, 1)
-    #                               1         1      3       1      1        3           1    1      24
-    detections = torch.cat([cls_ids, scores, size_3d, xs3d, ys3d, offset_center, xs2d, ys2d, heading], dim=2)
+    #                               1         1      3       1      1        3           24
+    detections = torch.cat([cls_ids, scores, size_3d, xs3d, ys3d, offset_center, heading], dim=2)
     return detections
 
 

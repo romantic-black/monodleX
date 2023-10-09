@@ -40,6 +40,6 @@ trainer:
 tester:
   type: *dataset_type
   mode: single   # 'single' or 'all'
-  checkpoint: '/mnt/e/Output/lr001/checkpoint_epoch_100.pth'  # for 'single' mode
+  checkpoint: '/mnt/e/Output/A1/checkpoint_epoch_140.pth'  # for 'single' mode
   checkpoints_dir: 'checkpoints'  # for 'all' model
   threshold: 0.2  # confidence filter
