@@ -18,13 +18,11 @@ from lib.helpers.tester_helper import Tester
 from lib.helpers.utils_helper import create_logger
 from lib.helpers.utils_helper import set_random_seed
 
-
 parser = argparse.ArgumentParser(description='End-to-End Monocular 3D Object Detection')
 parser.add_argument('--config', dest='config', help='settings of detection in yaml format')
 parser.add_argument('-e', '--evaluate_only', action='store_true', default=False, help='evaluation only')
 
 args = parser.parse_args()
-
 
 
 def main():
@@ -37,9 +35,8 @@ def main():
         os.makedirs(log_dir, exist_ok=True)
     logger = create_logger(os.path.join(log_dir, log_file))
 
-
     # build dataloader
-    train_loader, test_loader  = build_dataloader(cfg['dataset'])
+    train_loader, test_loader = build_dataloader(cfg['dataset'])
 
     # build model
     model = build_model(cfg)
@@ -60,10 +57,9 @@ def main():
     # build lr scheduler
     lr_scheduler, warmup_lr_scheduler = build_lr_scheduler(cfg['lr_scheduler'], optimizer, last_epoch=-1)
 
-
     logger.info('###################  Training  ##################')
-    logger.info('Batch Size: %d'  % (cfg['dataset']['batch_size']))
-    logger.info('Learning Rate: %f'  % (cfg['optimizer']['lr']))
+    logger.info('Batch Size: %d' % (cfg['dataset']['batch_size']))
+    logger.info('Learning Rate: %f' % (cfg['optimizer']['lr']))
     trainer = Trainer(cfg=cfg['trainer'],
                       model=model,
                       optimizer=optimizer,
@@ -75,7 +71,7 @@ def main():
                       log_dir=log_dir)
     trainer.train()
 
-    logger.info('###################  Evaluation  ##################' )
+    logger.info('###################  Evaluation  ##################')
     tester = Tester(cfg=cfg['tester'],
                     model=model,
                     dataloader=test_loader,

@@ -27,19 +27,20 @@ def image_point_to_road(road, calib, u, v):  # 输出位于 rect 坐标系
     return ground_point
 
 
-def decode_detections_(dets, info, threshold):
+def decode_detections_(dets, info, calibs, threshold):
     '''
     NOTE: THIS IS A NUMPY FUNCTION
     input:  #    1         1      3       1      1        3           1    1      24
             # [cls_ids, scores, size_3d, xs3d, ys3d, offset_center, xs2d, ys2d, heading]
-    input: info: {img_id:[B], img_size:[B,2], downsample_ratio:[B,2], road:[B,4], calib:list[B]}
+    input: info: {img_id:[B], img_size:[B,2], downsample_ratio:[B,2], road:[B,4]}
+    calibs: list[B]
     output:
     '''
     results = {}
     for i in range(dets.shape[0]):  # batch
         preds = []
         road = info['road'][i]
-        calib = info['calib'][i],
+        calib = calibs[i]
         for j in range(dets.shape[1]):  # max_dets = 50
 
             cls_id = int(dets[i, j, 0])
@@ -53,8 +54,7 @@ def decode_detections_(dets, info, threshold):
             xs2d, ys2d = dets[i, j, 10] * x_rate, dets[i, j, 11] * y_rate
 
             location = image_point_to_road(road, calib, xs3d, ys3d) + offset_center    # 中心点地面坐标
-            location[1] += h / 2
-            alpha = get_heading_angle(dets[i, j, 7:31])
+            alpha = get_heading_angle(heading)
             ry = calib.alpha2ry(alpha, xs2d)
 
             #### generate 2d bbox using 3d bbox
@@ -167,6 +167,8 @@ def extract_dets_from_outputs_(outputs, K=50):
     xs3d = xs2d + offset_3d[:, :, 0:1]  # 接地点坐标
     ys3d = ys2d + offset_3d[:, :, 1:2]
 
+    offset_center = _transpose_and_gather_feat(offset_center, inds)
+    offset_center = offset_center.view(batch, K, 3)
     heading = _transpose_and_gather_feat(heading, inds)
     heading = heading.view(batch, K, 24)
     size_3d = _transpose_and_gather_feat(size_3d, inds)
