@@ -78,7 +78,7 @@ def compute_offset2d_loss(input, target, edge_fusion=False):
 def compute_location_loss(input, target):
     offset_3d = extract_input_from_tensor(input['offset_3d'], target['indices'], target['mask_3d'])
     offset_center = extract_input_from_tensor(input['offset_center'], target['indices'], target['mask_3d'])
-    location_target = extract_target_from_tensor(target['loc_on_ground'], target['mask_3d'])
+    location_target = extract_target_from_tensor(target['location'], target['mask_3d'])
     road = extract_target_from_tensor(target['road'], target['mask_3d'])
     p2_inv = extract_target_from_tensor(target['p2_inv'], target['mask_3d'])
     indices = extract_target_from_tensor(target['indices'], target['mask_3d'])

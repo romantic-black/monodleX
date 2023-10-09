@@ -229,7 +229,7 @@ class KITTI_Dataset(data.Dataset):
         size_3d = np.zeros((self.max_objs, 3), dtype=np.float32)
         dimension = np.ones((self.max_objs, 3), dtype=np.float32)
         offset_3d = np.zeros((self.max_objs, 2), dtype=np.float32)
-        loc_on_ground = np.zeros((self.max_objs, 3), dtype=np.float32)
+        location = np.zeros((self.max_objs, 3), dtype=np.float32)
         roads = np.zeros((self.max_objs, 4), dtype=np.float32)
         p2_inv = np.zeros((self.max_objs, 4, 3), dtype=np.float32)
         indices = np.zeros((self.max_objs), dtype=np.int64)
@@ -309,7 +309,7 @@ class KITTI_Dataset(data.Dataset):
             size_3d[i] = src_size_3d[i] - mean_size     # 这俩好像一样？？
             dimension[i] = src_size_3d[i] - mean_size
 
-            loc_on_ground[i] = self.put_to_ground(objects[i].pos.reshape(1,-1), road)
+            location[i] = objects[i].pos
             roads[i] = np.array([*road])
             p2_inv[i] = np.linalg.pinv(calib.P2)
             ratio[i] = img_size / features_size
@@ -329,7 +329,7 @@ class KITTI_Dataset(data.Dataset):
                    'offset_3d': offset_3d,
                    'heading_bin': heading_bin,
                    'heading_res': heading_res,
-                   'loc_on_ground': loc_on_ground,
+                   'location': location,
                    'mask_2d': mask_2d,
                    'mask_3d': mask_3d,
                    'road': roads,
