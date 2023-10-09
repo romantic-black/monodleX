@@ -19,7 +19,7 @@ def compute_centernet3d_loss(input, target):
         edge_fusion = True
 
     seg_loss = compute_segmentation_loss(input, target)
-    offset2d_loss = compute_offset2d_loss(input, target, edge_fusion=edge_fusion)
+    # offset2d_loss = compute_offset2d_loss(input, target, edge_fusion=edge_fusion)
     # size2d_loss = compute_size2d_loss(input, target)
     # offset3d_loss = compute_offset3d_loss(input, target, edge_fusion=edge_fusion)
     # depth_loss = compute_depth_loss(input, target)
@@ -29,7 +29,7 @@ def compute_centernet3d_loss(input, target):
 
     # statistics
     stats_dict['seg'] = seg_loss.item()
-    stats_dict['offset2d'] = offset2d_loss.item()
+    # stats_dict['offset2d'] = offset2d_loss.item()
     # stats_dict['size2d'] = size2d_loss.item()
     # stats_dict['offset3d'] = offset3d_loss.item()
     # stats_dict['depth'] = depth_loss.item()
@@ -37,7 +37,7 @@ def compute_centernet3d_loss(input, target):
     stats_dict['heading'] = heading_loss.item()
     stats_dict['location'] = location_loss.item()
     # seg_loss > depth_loss > size2d_loss > heading_loss > size3d_loss
-    total_loss = seg_loss + offset2d_loss + size3d_loss + heading_loss + location_loss
+    total_loss = seg_loss + size3d_loss + heading_loss + location_loss
     return total_loss, stats_dict
 
 
@@ -77,14 +77,14 @@ def compute_offset2d_loss(input, target, edge_fusion=False):
 
 def compute_location_loss(input, target):
     offset_3d = extract_input_from_tensor(input['offset_3d'], target['indices'], target['mask_3d'])
-    offset2d_target = extract_target_from_tensor(target['offset_2d'], target['mask_2d'])    # 这里一个是2d一个是3d
     offset_center = extract_input_from_tensor(input['offset_center'], target['indices'], target['mask_3d'])
     location_target = extract_target_from_tensor(target['loc_on_ground'], target['mask_3d'])
     road = extract_target_from_tensor(target['road'], target['mask_3d'])
     p2_inv = extract_target_from_tensor(target['p2_inv'], target['mask_3d'])
     indices = extract_target_from_tensor(target['indices'], target['mask_3d'])
+    ratio = extract_target_from_tensor(target['ratio'], target['mask_3d'])
     u, v = (indices % 320).unsqueeze(1), (indices // 320).unsqueeze(1)
-    g_points = (torch.cat((u, v), dim=-1) + offset_3d + offset2d_target) * 4
+    g_points = (torch.cat((u, v), dim=-1) + offset_3d) * ratio
     proj = image_point_to_road(road, p2_inv, g_points)
     location = proj + offset_center
     if target['mask_3d'].sum() > 0:

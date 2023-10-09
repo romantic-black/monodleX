@@ -236,6 +236,7 @@ class KITTI_Dataset(data.Dataset):
         mask_2d = np.zeros((self.max_objs),
                            dtype=np.int64)  # if you use smaller batch_size, there is a greater probability of nan.
         mask_3d = np.zeros((self.max_objs), dtype=np.int64)
+        ratio = np.zeros((self.max_objs, 2), dtype=np.float32)
         object_num = len(objects) if len(objects) < self.max_objs else self.max_objs
         for i in range(object_num):
             # filter objects by writelist
@@ -311,6 +312,7 @@ class KITTI_Dataset(data.Dataset):
             loc_on_ground[i] = self.put_to_ground(objects[i].pos.reshape(1,-1), road)
             roads[i] = np.array([*road])
             p2_inv[i] = np.linalg.pinv(calib.P2)
+            ratio[i] = img_size / features_size
             mask_2d[i] = 1
             mask_3d[i] = 0 if random_crop_flag else 1
 
@@ -331,7 +333,8 @@ class KITTI_Dataset(data.Dataset):
                    'mask_2d': mask_2d,
                    'mask_3d': mask_3d,
                    'road': roads,
-                   'p2_inv': p2_inv}
+                   'p2_inv': p2_inv,
+                   'ratio': ratio}
         info = {'img_id': index,
                 'img_size': img_size,
                 'bbox_downsample_ratio': img_size / features_size,
