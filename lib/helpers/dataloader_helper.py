@@ -13,7 +13,7 @@ def my_worker_init_fn(worker_id):
 def build_dataloader(cfg, workers=4):
     # perpare dataset
     if cfg['type'] == 'KITTI':
-        train_set = KITTI_Dataset(split='train', cfg=cfg)
+        train_set = KITTI_Dataset(split='train_random', cfg=cfg)
         test_set = KITTI_Dataset(split='val', cfg=cfg)
     elif cfg['type'] == 'KITTI_v2':
         train_set = KITTI_Dataset_v2(split="train", cfg=cfg)
