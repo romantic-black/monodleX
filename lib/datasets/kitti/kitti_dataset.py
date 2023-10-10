@@ -40,7 +40,7 @@ class KITTI_Dataset(data.Dataset):
             self.writelist.extend(['DontCare'])
 
         # data split loading
-        assert self.split in ['train', 'val', 'trainval', 'test']
+        # assert self.split in ['train', 'val', 'trainval', 'test']
         flag = 'training' if self.split == 'train' else 'training'
         self.split_file = os.path.join('/root/monodleX/data/KITTI', 'ImageSets', self.split + '.txt')
         self.idx_list = [x.strip() for x in open(self.split_file).readlines()]
