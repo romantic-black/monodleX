@@ -41,5 +41,5 @@ tester:
   type: *dataset_type
   mode: single   # 'single' or 'all'
   checkpoint: '/mnt/e/Output/A2/checkpoint_epoch_140.pth'  # for 'single' mode
-  checkpoints_dir: 'checkpoints'  # for 'all' model
+  checkpoints_dir: '/mnt/e/Output/A2/'  # for 'all' model
   threshold: 0.5  # confidence filter
