@@ -30,8 +30,8 @@ def image_point_to_road(road, calib, u, v):  # 输出位于 rect 坐标系
 def decode_detections_(dets, info, calibs, threshold):
     '''
     NOTE: THIS IS A NUMPY FUNCTION
-    input:  #    1         1      3       1      1        3             24
-            # [cls_ids, scores, size_3d, xs3d, ys3d, offset_center,  heading]
+    input:  #    1         1      3       1      1        3             24     1
+            # [cls_ids, scores, size_3d, xs3d, ys3d, offset_center,  heading, xs2d]
     input: info: {img_id:[B], img_size:[B,2], downsample_ratio:[B,2], road:[B,4]}
     calibs: list[B]
     output:
@@ -51,11 +51,10 @@ def decode_detections_(dets, info, calibs, threshold):
             y_rate = info['bbox_downsample_ratio'][i][1]
             (h, w, l), xs3d, ys3d = dets[i, j, 2:5], dets[i, j, 5] * x_rate, dets[i, j, 6] * y_rate
             offset_center, heading = dets[i, j, 7:10], dets[i, j, 10:34]
-
+            xs2d = dets[i, j, 34] * x_rate
             location = image_point_to_road(road, calib, xs3d, ys3d) + offset_center    # 中心点地面坐标
-            xs2d, _ = calib.rect_to_img(location.reshape(1, -1))
             alpha = get_heading_angle(heading)
-            ry = calib.alpha2ry(alpha, xs2d[0, 0])
+            ry = calib.alpha2ry(alpha, xs2d)
 
             #### generate 2d bbox using 3d bbox
             x_corners = [l / 2, l / 2, -l / 2, -l / 2, l / 2, l / 2, -l / 2, -l / 2]
@@ -161,6 +160,7 @@ def extract_dets_from_outputs_(outputs, K=50):
     offset_3d = offset_3d.view(batch, K, 2)
     xs3d = xs.view(batch, K, 1) + offset_3d[:, :, 0:1]  # 接地点坐标
     ys3d = ys.view(batch, K, 1) + offset_3d[:, :, 1:2]
+    xs2d = xs.view(batch, K, 1)
 
     offset_center = _transpose_and_gather_feat(offset_center, inds)
     offset_center = offset_center.view(batch, K, 3)
@@ -171,7 +171,7 @@ def extract_dets_from_outputs_(outputs, K=50):
     cls_ids = cls_ids.view(batch, K, 1).float()
     scores = scores.view(batch, K, 1)
     #                               1         1      3       1      1        3           24
-    detections = torch.cat([cls_ids, scores, size_3d, xs3d, ys3d, offset_center, heading], dim=2)
+    detections = torch.cat([cls_ids, scores, size_3d, xs3d, ys3d, offset_center, heading, xs2d], dim=2)
     return detections
 
 
