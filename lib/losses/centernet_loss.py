@@ -10,7 +10,6 @@ from lib.losses.dim_aware_loss import dim_aware_l1_loss
 eps = 1e-6
 
 
-
 def compute_centernet3d_loss(input, target):
     stats_dict = {}
 
@@ -56,18 +55,19 @@ def compute_size2d_loss(input, target):
         size2d_loss = torch.tensor([0.0]).to(size2d_input.device)
     return size2d_loss
 
+
 def compute_offset2d_loss(input, target, edge_fusion=False):
     # compute offset2d loss
     offset2d_input = extract_input_from_tensor(input['offset_2d'], target['indices'], target['mask_2d'])
     offset2d_target = extract_target_from_tensor(target['offset_2d'], target['mask_2d'])
-    if edge_fusion:     # False
+    if edge_fusion:  # False
         trunc_mask = extract_target_from_tensor(target['trunc_mask'], target['mask_2d']).bool()
         offset2d_loss = F.l1_loss(offset2d_input, offset2d_target, reduction='none').sum(dim=1)
         # use different loss functions for inside and outside objects
         trunc_offset_loss = torch.log(1 + offset2d_loss[trunc_mask]).sum() / torch.clamp(trunc_mask.sum() + eps, min=1)
         offset2d_loss = offset2d_loss[~trunc_mask].mean()
         return trunc_offset_loss + offset2d_loss
-    elif(target['mask_2d'].sum() > 0):  # True
+    elif (target['mask_2d'].sum() > 0):  # True
         offset2d_loss = F.l1_loss(offset2d_input, offset2d_target, reduction='mean')
         return offset2d_loss
     else:
@@ -77,7 +77,7 @@ def compute_offset2d_loss(input, target, edge_fusion=False):
 
 def compute_location_loss(input, target):
     offset_3d = extract_input_from_tensor(input['offset_3d'], target['indices'], target['mask_3d'])
-    offset_center = extract_input_from_tensor(input['offset_center'], target['indices'], target['mask_3d'])
+    offset_3d, offset_center, log_variance = offset_3d[:, 0:2], offset_3d[:, 2:5], offset_3d[:, 5:]
     location_target = extract_target_from_tensor(target['location'], target['mask_3d'])
     road = extract_target_from_tensor(target['road'], target['mask_3d'])
     p2_inv = extract_target_from_tensor(target['p2_inv'], target['mask_3d'])
@@ -88,10 +88,12 @@ def compute_location_loss(input, target):
     proj = image_point_to_road(road, p2_inv, g_points)
     location = proj + offset_center
     if target['mask_3d'].sum() > 0:
-        location_loss = F.l1_loss(location, location_target, reduction='mean')
+        location_loss = laplacian_aleatoric_uncertainty_loss(location, location_target,
+                                                             log_variance, reduction='mean')
     else:
         location_loss = torch.tensor([0.0]).to(g_points.device)
     return location_loss
+
 
 def compute_depth_loss(input, target):
     # depth: [4,2,96,328], indices: [4, 50], mask_3d: [4, 50]
@@ -100,7 +102,7 @@ def compute_depth_loss(input, target):
     # 1e-6 保证输出接近 0 时不受干扰，x = 0.5 时，输出约为 1，因此 -1 进行去中心化
     depth_input = 1. / (depth_input.sigmoid() + 1e-6) - 1.
     depth_target = extract_target_from_tensor(target['depth'], target['mask_3d'])
-    if target['mask_3d'].sum() > 0:     # 来自 monopair
+    if target['mask_3d'].sum() > 0:  # 来自 monopair
         depth_loss = laplacian_aleatoric_uncertainty_loss(depth_input, depth_target, depth_log_variance)
     else:
         depth_loss = torch.tensor([0.0]).to(depth_input.device)
@@ -117,10 +119,12 @@ def compute_offset3d_loss(input, target, edge_fusion=False):
     if edge_fusion:
         sum_target_trunc_mask = target['trunc_mask'].sum()
         if sum_target_trunc_mask > 0:
-            trunc_offset3d_input = extract_input_from_tensor(input['offset_3d'], target['indices'], target['trunc_mask'])
+            trunc_offset3d_input = extract_input_from_tensor(input['offset_3d'], target['indices'],
+                                                             target['trunc_mask'])
             trunc_offset3d_target = extract_target_from_tensor(target['offset_3d'], target['trunc_mask'])
             trunc_offset3d_loss = torch.log(1 + F.l1_loss(trunc_offset3d_input,
-                                                          trunc_offset3d_target, reduction='none').sum() / torch.clamp(sum_target_trunc_mask, min=1))
+                                                          trunc_offset3d_target, reduction='none').sum() / torch.clamp(
+                sum_target_trunc_mask, min=1))
 
         else:
             trunc_offset3d_loss = torch.tensor([0.0]).to(offset3d_input.device)
@@ -141,7 +145,7 @@ def compute_size3d_loss(input, target):
 
 
 def compute_heading_loss(input, target):
-    heading_input = _transpose_and_gather_feat(input['heading'], target['indices'])   # B * C * H * W ---> B * K * C
+    heading_input = _transpose_and_gather_feat(input['heading'], target['indices'])  # B * C * H * W ---> B * K * C
     heading_input = heading_input.view(-1, 24)
     heading_target_cls = target['heading_bin'].view(-1)
     heading_target_res = target['heading_res'].view(-1)
@@ -160,7 +164,9 @@ def compute_heading_loss(input, target):
     heading_input_res = heading_input[:, 12:24]
     heading_input_res, heading_target_res = heading_input_res[mask > 0], heading_target_res[mask > 0]
 
-    cls_onehot = torch.zeros(heading_target_cls.shape[0], 12).cuda().scatter_(dim=1, index=heading_target_cls.view(-1, 1), value=1)
+    cls_onehot = torch.zeros(heading_target_cls.shape[0], 12).cuda().scatter_(dim=1,
+                                                                              index=heading_target_cls.view(-1, 1),
+                                                                              value=1)
     heading_input_res = torch.sum(heading_input_res * cls_onehot, 1)
     reg_loss = F.l1_loss(heading_input_res, heading_target_res, reduction='mean')
     if torch.any(torch.isnan(reg_loss)):
@@ -187,20 +193,21 @@ def image_point_to_road(road, p2_inv, points):  # 输出位于 rect 坐标系
     ray = torch.bmm(p2_inv, uv_hom.unsqueeze(2)).squeeze(2)
 
     # Since the ray is lambda * [X, Y, Z, 1]^T, its direction is only the first 3 elements.
-    dir = ray[:,:3]
+    dir = ray[:, :3]
 
     # Step 3: Compute the intersection of the ray with the ground plane
     # ax + by + cz + d = 0 => aX + bY + cZ + d = 0 (for homogeneous [X, Y, Z, 1]^T)
     # lambda is the scaling factor
-    lambda_val = -road[:,3] / (road[:,0] * dir[:, 0] + road[:,1] * dir[:, 1] + road[:,2] * dir[:, 2])
+    lambda_val = -road[:, 3] / (road[:, 0] * dir[:, 0] + road[:, 1] * dir[:, 1] + road[:, 2] * dir[:, 2])
     lambda_val = lambda_val.unsqueeze(1)
     # Step 4: Compute the ground point
     ground_point = dir * lambda_val
     return ground_point
 
+
 if __name__ == '__main__':
-    input_cls  = torch.zeros(2, 50, 12)  # B * 50 * 24
-    input_reg  = torch.zeros(2, 50, 12)  # B * 50 * 24
+    input_cls = torch.zeros(2, 50, 12)  # B * 50 * 24
+    input_reg = torch.zeros(2, 50, 12)  # B * 50 * 24
     target_cls = torch.zeros(2, 50, 1, dtype=torch.int64)
     target_reg = torch.zeros(2, 50, 1)
 
@@ -213,4 +220,3 @@ if __name__ == '__main__':
     d = torch.zeros(2, 10, 1).long()
     e = torch.zeros(2, 10, 1)
     print(compute_heading_loss(a, b, c, d, e))
-
