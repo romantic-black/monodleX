@@ -77,7 +77,7 @@ def compute_offset2d_loss(input, target, edge_fusion=False):
 
 def compute_location_loss(input, target):
     offset_3d = extract_input_from_tensor(input['offset_3d'], target['indices'], target['mask_3d'])
-    offset_3d, offset_center, log_variance = offset_3d[:, 0:2], offset_3d[:, 2:5], offset_3d[:, 5]
+    offset_3d, offset_center, log_variance = offset_3d[:, 0:2], offset_3d[:, 2:5], offset_3d[:, 5:]
     location_target = extract_target_from_tensor(target['location'], target['mask_3d'])
     road = extract_target_from_tensor(target['road'], target['mask_3d'])
     p2_inv = extract_target_from_tensor(target['p2_inv'], target['mask_3d'])
@@ -88,7 +88,8 @@ def compute_location_loss(input, target):
     proj = image_point_to_road(road, p2_inv, g_points)
     location = proj + offset_center
     if target['mask_3d'].sum() > 0:
-        location_loss = laplacian_aleatoric_uncertainty_loss(location, location_target, log_variance, reduction='mean')
+        location_loss = laplacian_aleatoric_uncertainty_loss(location, location_target,
+                                                             log_variance, reduction='mean')
     else:
         location_loss = torch.tensor([0.0]).to(g_points.device)
     return location_loss

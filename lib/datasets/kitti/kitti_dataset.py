@@ -244,7 +244,7 @@ class KITTI_Dataset(data.Dataset):
                 continue
 
             # filter inappropriate samples  # 过近的（前向2m）内的物体不加入训练，感觉有点道理
-            if objects[i].level_str == 'UnKnown' or objects[i].pos[-1] < 2:
+            if objects[i].level_str == 'UnKnown' or objects[i].pos[-1] <= 0:
                 continue
 
             # ignore the samples beyond the threshold [hard encoding] # 移除过远物体
