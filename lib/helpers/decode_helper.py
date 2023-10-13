@@ -45,7 +45,7 @@ def decode_detections_(dets, info, calibs, threshold):
 
             cls_id = int(dets[i, j, 0])
             score = dets[i, j, 1]
-            log_var = dets[i, j, 35]
+            sigma = dets[i, j, 35]
             if score < threshold:  # 0.2
                 continue
             x_rate = info['bbox_downsample_ratio'][i][0]
@@ -70,6 +70,7 @@ def decode_detections_(dets, info, calibs, threshold):
             corners3d = corners3d + location
             bbox, _ = calib.corners3d_to_img_boxes(corners3d.reshape(1, 8, 3))
             bbox = bbox.reshape(-1).tolist()
+            score = score * sigma
 
             preds.append([cls_id, alpha] + bbox + [h, w, l] + location.tolist() + [ry, score])
         results[info['img_id'][i]] = preds
@@ -149,7 +150,7 @@ def extract_dets_from_outputs_(outputs, K=50):
     # size_2d = outputs['size_2d']
     # offset_2d = outputs['offset_2d']
     offset_3d, offset_center, log_var = offset_3d[:, 0:2], offset_3d[:, 2:5], offset_3d[:, 5:]
-    log_var = torch.exp(-log_var)
+    sigma = torch.exp(-log_var)
     heatmap = torch.clamp(heatmap.sigmoid_(), min=1e-4, max=1 - 1e-4)
     batch, channel, height, width = heatmap.size()  # get shape
     # perform nms on heatmaps
@@ -164,7 +165,7 @@ def extract_dets_from_outputs_(outputs, K=50):
 
     offset_center = _transpose_and_gather_feat(offset_center, inds)
     offset_center = offset_center.view(batch, K, 3)
-    log_var = _transpose_and_gather_feat(log_var, inds)
+    sigma = _transpose_and_gather_feat(sigma, inds)
     heading = _transpose_and_gather_feat(heading, inds)
     heading = heading.view(batch, K, 24)
     size_3d = _transpose_and_gather_feat(size_3d, inds)
@@ -172,7 +173,7 @@ def extract_dets_from_outputs_(outputs, K=50):
     cls_ids = cls_ids.view(batch, K, 1).float()
     scores = scores.view(batch, K, 1)
     #                               1         1      3       1      1        3           24
-    detections = torch.cat([cls_ids, scores, size_3d, xs3d, ys3d, offset_center, heading, xs2d, log_var], dim=2)
+    detections = torch.cat([cls_ids, scores, size_3d, xs3d, ys3d, offset_center, heading, xs2d, sigma], dim=2)
     return detections
 
 
