@@ -104,7 +104,7 @@ def compute_margin_loss(input, target):
     pred2 = extract_input_from_tensor(input['pred2'], target['indices'], target['mask_3d'])
     offset_3d_1, offset_3d_2 = pred1[:, 0:2], pred2[:, 0:2]
     size_2d = extract_target_from_tensor(target['size_2d'], target['mask_3d'])
-    threshold = torch.norm(size_2d, dim=1) / 2
+    threshold = torch.norm(size_2d, dim=1) / 4 / 2      # 4 for down sample
     if target['mask_3d'].sum() > 0:
         margin_loss = margin_distanse_loss(offset_3d_1, offset_3d_2,
                                            threshold, reduction='mean')

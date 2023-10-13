@@ -32,7 +32,7 @@ lr_scheduler:
 
 trainer:
   max_epoch: 140
-  gpu_ids: 0, 1
+  gpu_ids: 0
   save_frequency: 10 # checkpoint save interval (in epoch)
   # resume_model: '/root/monodleX/work_dirs/checkpoints/checkpoint_epoch_70.pth'
 
