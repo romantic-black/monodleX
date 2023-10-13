@@ -14,7 +14,7 @@ def build_dataloader(cfg, workers=4):
     # perpare dataset
     if cfg['type'] == 'KITTI':
         train_set = KITTI_Dataset(split='train_random', cfg=cfg)
-        test_set = KITTI_Dataset(split='val', cfg=cfg)
+        test_set = KITTI_Dataset(split='val_random', cfg=cfg)
     elif cfg['type'] == 'KITTI_v2':
         train_set = KITTI_Dataset_v2(split="train", cfg=cfg)
         test_set = KITTI_Dataset_v2(split='val', cfg=cfg)

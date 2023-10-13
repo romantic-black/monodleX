@@ -4,9 +4,7 @@ import tqdm
 import torch
 
 from lib.helpers.save_helper import load_checkpoint
-from lib.helpers.decode_helper import extract_dets_from_outputs
-from lib.helpers.decode_helper import decode_detections
-
+from lib.helpers.decode_helper import extract_dets_from_outputs_, decode_detections_
 
 
 class Tester(object):
@@ -14,7 +12,7 @@ class Tester(object):
         self.cfg = cfg
         self.model = model
         self.dataloader = dataloader
-        self.max_objs = dataloader.dataset.max_objs    # max objects per images, defined in dataset
+        self.max_objs = dataloader.dataset.max_objs  # max objects per images, defined in dataset
         self.class_name = dataloader.dataset.class_name
         self.log_dir = log_dir
         self.output_dir = os.path.join(log_dir, './outputs')
@@ -22,7 +20,6 @@ class Tester(object):
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         self.logger = logger
         self.eval = eval
-
 
     def test(self):
         assert self.cfg['mode'] in ['single', 'all']
@@ -56,8 +53,6 @@ class Tester(object):
                 self.inference()
                 self.evaluate()
 
-
-
     def inference(self):
         torch.set_grad_enabled(False)
         self.model.eval()
@@ -70,18 +65,16 @@ class Tester(object):
             for key in info.keys():
                 info[key] = info[key].to(self.device)
             outputs = self.model(inputs, info)
-            dets = extract_dets_from_outputs(outputs=outputs, K=self.max_objs)
+            dets = extract_dets_from_outputs_(outputs=outputs, K=self.max_objs)
             dets = dets.detach().cpu().numpy()
 
             # get corresponding calibs & transform tensor to numpy
-            calibs = [self.dataloader.dataset.get_calib(index)  for index in info['img_id']]
+            calibs = [self.dataloader.dataset.get_calib(index) for index in info['img_id']]
             info = {key: val.detach().cpu().numpy() for key, val in info.items()}
-            cls_mean_size = self.dataloader.dataset.cls_mean_size
-            dets = decode_detections(dets=dets,
-                                     info=info,
-                                     calibs=calibs,
-                                     cls_mean_size=cls_mean_size,
-                                     threshold=self.cfg.get('threshold', 0.2))
+            dets = decode_detections_(dets=dets,
+                                      info=info,
+                                      calibs=calibs,
+                                      threshold=self.cfg.get('threshold', 0.2))
             results.update(dets)
             progress_bar.update()
 
@@ -90,8 +83,6 @@ class Tester(object):
         # save the result for evaluation.
         self.logger.info('==> Saving ...')
         self.save_results(results, output_dir=self.output_dir)
-
-
 
     def save_results(self, results, output_dir='./outputs'):
         output_dir = os.path.join(output_dir, 'data')
@@ -115,8 +106,5 @@ class Tester(object):
                 f.write('\n')
             f.close()
 
-
-
     def evaluate(self):
         self.dataloader.dataset.eval(results_dir=os.path.join(self.log_dir, './outputs/data'), logger=self.logger)
-
