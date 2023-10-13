@@ -29,7 +29,7 @@ class CenterNet3D(nn.Module):
             self.consider_outside_objs = True
         # 输出名称: 输出维数, offset_3d: [u, v, dx, dy, dz, sigma]
         self.heads = {'heatmap': num_class,
-                      'offset_3d': 6, 'size_3d': 3, 'heading': 24}
+                      'offset_3d': 7, 'size_3d': 3, 'heading': 24}
 
         self.use_dlaup = True
         if backbone == 'dla34':
