@@ -232,6 +232,7 @@ class KITTI_Dataset(data.Dataset):
         location = np.zeros((self.max_objs, 3), dtype=np.float32)
         roads = np.zeros((self.max_objs, 4), dtype=np.float32)
         p2_inv = np.zeros((self.max_objs, 4, 3), dtype=np.float32)
+        cu_cv_fu_fv_tx_ty = np.zeros((self.max_objs, 6), dtype=np.float32)
         indices = np.zeros((self.max_objs), dtype=np.int64)
         mask_2d = np.zeros((self.max_objs),
                            dtype=np.int64)  # if you use smaller batch_size, there is a greater probability of nan.
@@ -312,6 +313,7 @@ class KITTI_Dataset(data.Dataset):
             location[i] = objects[i].pos
             roads[i] = np.array([*road])
             p2_inv[i] = np.linalg.pinv(calib.P2)
+            cu_cv_fu_fv_tx_ty[i] = np.array([calib.cu, calib.cv, calib.fu, calib.fv, calib.tx, calib.ty], dtype=np.float32)
             ratio[i] = img_size / features_size
             mask_2d[i] = 1
             mask_3d[i] = 0 if random_crop_flag else 1
@@ -334,6 +336,7 @@ class KITTI_Dataset(data.Dataset):
                    'mask_3d': mask_3d,
                    'road': roads,
                    'p2_inv': p2_inv,
+                   'cu_cv_fu_fv_tx_ty': cu_cv_fu_fv_tx_ty,
                    'ratio': ratio}
         info = {'img_id': index,
                 'img_size': img_size,

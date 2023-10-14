@@ -79,17 +79,18 @@ def compute_offset2d_loss(input, target, edge_fusion=False):
         return offset2d_loss
 
 
-def compute_location_loss(input, target, index):
-    pred = extract_input_from_tensor(input[f'pred{index}'], target['indices'], target['mask_3d'])
-    offset_3d, offset_center, log_variance = pred[:, 0:2], pred[:, 2:5], pred[:, 5:]
+def compute_location_loss(input, target):
+    offset_3d = extract_input_from_tensor(input['offset_3d'], target['indices'], target['mask_3d'])
+    offset_3d, offset_center, log_variance, depth = \
+        offset_3d[:, 0:2], offset_3d[:, 2:5], offset_3d[:, 5:6], offset_3d[:, 6:7]
+    depth = 1. / (depth.sigmoid() + 1e-6) - 1.
     location_target = extract_target_from_tensor(target['location'], target['mask_3d'])
-    road = extract_target_from_tensor(target['road'], target['mask_3d'])
-    p2_inv = extract_target_from_tensor(target['p2_inv'], target['mask_3d'])
+    calib = extract_target_from_tensor(target['cu_cv_fu_fv_tx_ty'], target['mask_3d'])
     indices = extract_target_from_tensor(target['indices'], target['mask_3d'])
     ratio = extract_target_from_tensor(target['ratio'], target['mask_3d'])
     u, v = (indices % 320).unsqueeze(1), (indices // 320).unsqueeze(1)
     g_points = (torch.cat((u, v), dim=-1) + offset_3d) * ratio
-    proj = image_point_to_road(road, p2_inv, g_points)
+    proj = img_to_rect(g_points, depth, calib)
     location = proj + offset_center
     if target['mask_3d'].sum() > 0:
         location_loss = laplacian_aleatoric_uncertainty_loss(location, location_target,
@@ -227,6 +228,12 @@ def image_point_to_road(road, p2_inv, points):  # 输出位于 rect 坐标系
     # Step 4: Compute the ground point
     ground_point = dir * lambda_val
     return ground_point
+
+
+def img_to_rect(points, depth, calib):
+    x = ((points[:, 0:1] - calib[:, 0:1]) * depth) / calib[:, 2:3] + calib[:, 4:5]
+    y = ((points[:, 1:2] - calib[:, 1:2]) * depth) / calib[:, 3:4] + calib[:, 5:6]
+    return torch.cat((x, y, depth), dim=-1)
 
 
 if __name__ == '__main__':
