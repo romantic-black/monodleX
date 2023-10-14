@@ -46,14 +46,18 @@ def decode_detections_(dets, info, calibs, threshold):
 
             cls_id = int(dets[i, j, 0])
             score = dets[i, j, 1]
-            sigma = dets[i, j, 35]
+            sigma_1, sigma_2 = dets[i, j, 35], dets[i, j, 42]
+
             if score < threshold:  # 0.2
                 continue
+
             x_rate = info['bbox_downsample_ratio'][i][0]
             y_rate = info['bbox_downsample_ratio'][i][1]
             (h, w, l), xs3d, ys3d = dets[i, j, 2:5], dets[i, j, 5] * x_rate, dets[i, j, 6] * y_rate
             offset_center, heading = dets[i, j, 7:10], dets[i, j, 10:34]
             xs2d, depth = dets[i, j, 34] * x_rate, dets[i, j, 36]
+            if False:
+                xs3d, ys3d, offset_center, depth = dets[i, j, 37] * x_rate, dets[i, j, 38] * y_rate, dets[i, j, 39:42], dets[i, j, 43]
 
             location = calib.img_to_rect(xs3d, ys3d, depth) + offset_center
             location = location.reshape(-1)
@@ -72,7 +76,7 @@ def decode_detections_(dets, info, calibs, threshold):
             corners3d = corners3d + location
             bbox, _ = calib.corners3d_to_img_boxes(corners3d.reshape(1, 8, 3))
             bbox = bbox.reshape(-1).tolist()
-            score = score * sigma
+            score = score * (sigma_1 if sigma_1 > sigma_2 else sigma_2)
 
             preds.append([cls_id, alpha] + bbox + [h, w, l] + location.tolist() + [ry, score])
         results[info['img_id'][i]] = preds
@@ -151,35 +155,52 @@ def extract_dets_from_outputs_(outputs, K=50):
     offset_3d = outputs['offset_3d']
     # size_2d = outputs['size_2d']
     # offset_2d = outputs['offset_2d']
-    offset_3d, offset_center, log_var, depth = offset_3d[:, 0:2], offset_3d[:, 2:5], offset_3d[:, 5:6], offset_3d[:, 6:7]
-    sigma = torch.exp(-log_var)
-    depth = 1. / (depth.sigmoid() + 1e-6) - 1.
+    offset_3d_1, offset_center_1, log_var, depth_1 = offset_3d[:, 0:2], offset_3d[:, 2:5], offset_3d[:, 5:6], offset_3d[:, 6:7]
+    sigma_1 = torch.exp(-log_var)
+    depth_1 = 1. / (depth_1.sigmoid() + 1e-6) - 1.
     heatmap = torch.clamp(heatmap.sigmoid_(), min=1e-4, max=1 - 1e-4)
     batch, channel, height, width = heatmap.size()  # get shape
     # perform nms on heatmaps
     heatmap = _nms(heatmap)
     scores, inds, cls_ids, xs, ys = _topk(heatmap, K=K)
 
-    offset_3d = _transpose_and_gather_feat(offset_3d, inds)
-    offset_3d = offset_3d.view(batch, K, 2)
-    xs3d = xs.view(batch, K, 1) + offset_3d[:, :, 0:1]  # 接地点坐标
-    ys3d = ys.view(batch, K, 1) + offset_3d[:, :, 1:2]
+    offset_3d_1 = _transpose_and_gather_feat(offset_3d_1, inds)
+    offset_3d_1 = offset_3d_1.view(batch, K, 2)
+    xs3d_1 = xs.view(batch, K, 1) + offset_3d_1[:, :, 0:1]  # 接地点坐标
+    ys3d_1 = ys.view(batch, K, 1) + offset_3d_1[:, :, 1:2]
     xs2d = xs.view(batch, K, 1)
 
-    offset_center = _transpose_and_gather_feat(offset_center, inds)
-    offset_center = offset_center.view(batch, K, 3)
-    depth = _transpose_and_gather_feat(depth, inds)
-    depth = depth.view(batch, K, 1)
-    sigma = _transpose_and_gather_feat(sigma, inds)
-    sigma = sigma.view(batch, K, 1)
+    offset_center_1 = _transpose_and_gather_feat(offset_center_1, inds)
+    offset_center_1 = offset_center_1.view(batch, K, 3)
+    depth_1 = _transpose_and_gather_feat(depth_1, inds)
+    depth_1 = depth_1.view(batch, K, 1)
+    sigma_1 = _transpose_and_gather_feat(sigma_1, inds)
+    sigma_1 = sigma_1.view(batch, K, 1)
     heading = _transpose_and_gather_feat(heading, inds)
     heading = heading.view(batch, K, 24)
     size_3d = _transpose_and_gather_feat(size_3d, inds)
     size_3d = size_3d.view(batch, K, 3)
     cls_ids = cls_ids.view(batch, K, 1).float()
     scores = scores.view(batch, K, 1)
-    #                               1         1      3       1      1        3           24
-    detections = torch.cat([cls_ids, scores, size_3d, xs3d, ys3d, offset_center, heading, xs2d, sigma, depth], dim=2)
+
+    offset_3d_2, offset_center_2, log_var, depth_2 = offset_3d[:, 7:9], offset_3d[:, 9:12], offset_3d[:, 12:13], offset_3d[:, 13:14]
+    offset_3d_2 = _transpose_and_gather_feat(offset_3d_2, inds)
+    offset_3d_2 = offset_3d_2.view(batch, K, 2)
+    xs3d_2 = xs.view(batch, K, 1) + offset_3d_2[:, :, 0:1]  # 接地点坐标
+    ys3d_2 = ys.view(batch, K, 1) + offset_3d_2[:, :, 1:2]
+    xs2d = xs.view(batch, K, 1)
+    sigma_2 = torch.exp(-log_var)
+    depth_2 = 1. / (depth_2.sigmoid() + 1e-6) - 1.
+    offset_center_2 = _transpose_and_gather_feat(offset_center_2, inds)
+    offset_center_2 = offset_center_2.view(batch, K, 3)
+    depth_2 = _transpose_and_gather_feat(depth_2, inds)
+    depth_2 = depth_2.view(batch, K, 1)
+    sigma_2 = _transpose_and_gather_feat(sigma_2, inds)
+    sigma_2 = sigma_2.view(batch, K, 1)
+    #                               1         1      3       1      1              3           24      1       1        1
+    detections = torch.cat([cls_ids, scores, size_3d, xs3d_1, ys3d_1, offset_center_1, heading, xs2d, sigma_1, depth_1,
+                            # 1       1            3           1         1
+                            xs3d_2, ys3d_2, offset_center_2, sigma_2, depth_2], dim=2)
     return detections
 
 
