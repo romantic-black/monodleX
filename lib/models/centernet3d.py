@@ -27,9 +27,9 @@ class CenterNet3D(nn.Module):
         self.consider_outside_objs = False
         if cfg['dataset']['type'] == 'KITTI_v2':
             self.consider_outside_objs = True
-        # 输出名称: 输出维数, offset_3d: [u, v, dx, dy, dz, sigma]
+        # 输出名称: 输出维数, offset_3d: [u, v, dx, dy, dz, sigma, depth] * 2
         self.heads = {'heatmap': num_class,
-                      'pred1': 6, 'pred2': 6, 'size_3d': 3, 'heading': 24}
+                      'offset_3d': 14, 'size_3d': 3, 'heading': 24}
 
         self.use_dlaup = True
         if backbone == 'dla34':
