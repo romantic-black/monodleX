@@ -8,7 +8,7 @@ dataset:
   use_dontcare: False
   bbox2d_type: 'anno'   # 'proj' or 'anno'
   meanshape: False      # use predefined anchor or not
-  writelist: ['Car']
+  writelist: ['Car', 'Pedestrian', 'Cyclist']
   random_flip: 0.5
   random_crop: 0.5
   scale: 0.4
