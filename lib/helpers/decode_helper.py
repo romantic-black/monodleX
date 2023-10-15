@@ -72,7 +72,6 @@ def decode_detections_(dets, info, calibs, threshold):
             corners3d = corners3d + location
             bbox, _ = calib.corners3d_to_img_boxes(corners3d.reshape(1, 8, 3))
             bbox = bbox.reshape(-1).tolist()
-            score = score * sigma
 
             preds.append([cls_id, alpha] + bbox + [h, w, l] + location.tolist() + [ry, score])
         results[info['img_id'][i]] = preds
