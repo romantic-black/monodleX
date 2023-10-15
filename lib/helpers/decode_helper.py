@@ -56,7 +56,7 @@ def decode_detections_(dets, info, calibs, threshold):
             (h, w, l), xs3d, ys3d = dets[i, j, 2:5], dets[i, j, 5] * x_rate, dets[i, j, 6] * y_rate
             offset_center, heading = dets[i, j, 7:10], dets[i, j, 10:34]
             xs2d, depth = dets[i, j, 34] * x_rate, dets[i, j, 36]
-            if False:
+            if sigma_2 > sigma_1:
                 xs3d, ys3d, offset_center, depth = dets[i, j, 37] * x_rate, dets[i, j, 38] * y_rate, dets[i, j, 39:42], dets[i, j, 43]
 
             location = calib.img_to_rect(xs3d, ys3d, depth) + offset_center
@@ -76,7 +76,6 @@ def decode_detections_(dets, info, calibs, threshold):
             corners3d = corners3d + location
             bbox, _ = calib.corners3d_to_img_boxes(corners3d.reshape(1, 8, 3))
             bbox = bbox.reshape(-1).tolist()
-            score = score * (sigma_1 if sigma_1 > sigma_2 else sigma_2)
 
             preds.append([cls_id, alpha] + bbox + [h, w, l] + location.tolist() + [ry, score])
         results[info['img_id'][i]] = preds
