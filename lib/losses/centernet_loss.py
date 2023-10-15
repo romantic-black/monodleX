@@ -4,7 +4,7 @@ import torch.nn.functional as F
 import numpy as np
 from lib.helpers.decode_helper import _transpose_and_gather_feat
 from lib.losses.focal_loss import focal_loss_cornernet
-from lib.losses.uncertainty_loss import laplacian_aleatoric_uncertainty_loss
+from lib.losses.uncertainty_loss import laplacian_aleatoric_uncertainty_loss, gaussian_aleatoric_uncertainty_loss
 from lib.losses.dim_aware_loss import dim_aware_l1_loss
 
 eps = 1e-6
@@ -25,6 +25,7 @@ def compute_centernet3d_loss(input, target):
     size3d_loss = compute_size3d_loss(input, target)
     heading_loss = compute_heading_loss(input, target)
     location_loss = compute_location_loss(input, target)
+    ground_loss = compute_ground_loss(input, target)
 
     # statistics
     stats_dict['seg'] = seg_loss.item()
@@ -35,8 +36,9 @@ def compute_centernet3d_loss(input, target):
     stats_dict['size3d'] = size3d_loss.item()
     stats_dict['heading'] = heading_loss.item()
     stats_dict['location'] = location_loss.item()
+    stats_dict['ground'] = ground_loss.item()
     # seg_loss > depth_loss > size2d_loss > heading_loss > size3d_loss
-    total_loss = seg_loss + size3d_loss + heading_loss + location_loss
+    total_loss = seg_loss + size3d_loss + heading_loss + location_loss + ground_loss
     return total_loss, stats_dict
 
 
@@ -94,6 +96,26 @@ def compute_location_loss(input, target):
     else:
         location_loss = torch.tensor([0.0]).to(g_points.device)
     return location_loss
+
+
+def compute_ground_loss(input, target):
+    offset_3d = extract_input_from_tensor(input['offset_3d'], target['indices'], target['mask_3d'])
+    offset_3d, depth, log_var_ground = offset_3d[:, 0:2], offset_3d[:, 6:7], offset_3d[:, 7:8]
+    depth = 1. / (depth.sigmoid() + 1e-6) - 1.
+    calib = extract_target_from_tensor(target['cu_cv_fu_fv_tx_ty'], target['mask_3d'])
+    road = extract_target_from_tensor(target['road'], target['mask_3d'])
+    p2_inv = extract_target_from_tensor(target['p2_inv'], target['mask_3d'])
+    indices = extract_target_from_tensor(target['indices'], target['mask_3d'])
+    ratio = extract_target_from_tensor(target['ratio'], target['mask_3d'])
+    u, v = (indices % 320).unsqueeze(1), (indices // 320).unsqueeze(1)
+    g_points = (torch.cat((u, v), dim=-1) + offset_3d) * ratio
+    proj_input = image_point_to_road(road, p2_inv, g_points)
+    proj_target = img_to_rect(g_points, depth, calib)
+    if target['mask_3d'].sum() > 0:  # 来自 monopair
+        depth_loss = gaussian_aleatoric_uncertainty_loss(proj_input, proj_target, log_var_ground)
+    else:
+        depth_loss = torch.tensor([0.0]).to(offset_3d.device)
+    return depth_loss
 
 
 def compute_depth_loss(input, target):

@@ -2,13 +2,13 @@ random_seed: 444
 
 dataset:
   type: &dataset_type 'KITTI'
-  batch_size: 24
+  batch_size: 48
   use_3d_center: True
   class_merging: False
   use_dontcare: False
   bbox2d_type: 'anno'   # 'proj' or 'anno'
   meanshape: False      # use predefined anchor or not
-  writelist: ['Car']
+  writelist: ['Car', 'Pedestrian', 'Cyclist']
   random_flip: 0.5
   random_crop: 0.5
   scale: 0.4
