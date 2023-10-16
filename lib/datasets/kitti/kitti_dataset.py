@@ -7,7 +7,7 @@ from lib.datasets.utils import angle2class
 from lib.datasets.utils import gaussian_radius
 from lib.datasets.utils import draw_umich_gaussian
 from lib.datasets.kitti.kitti_utils import get_objects_from_label
-from lib.datasets.kitti.kitti_utils import Calibration
+from lib.datasets.kitti.kitti_utils import Calibration, CalibrationAugment
 from lib.datasets.kitti.kitti_utils import get_affine_transform
 from lib.datasets.kitti.kitti_utils import affine_transform
 from lib.datasets.kitti.kitti_eval_python.eval import get_official_eval_result
@@ -55,7 +55,7 @@ class KITTI_Dataset(data.Dataset):
         self.road_dir = os.path.join(self.data_dir, 'planes')
 
         # data augmentation configuration
-        self.data_augmentation = True if split in ['train', 'trainval'] else False
+        self.data_augmentation = True if split in ['train', 'trainval', 'train_random'] else False
         self.random_flip = cfg.get('random_flip', 0.5)
         self.random_crop = cfg.get('random_crop', 0.5)
         self.scale = cfg.get('scale', 0.4)
@@ -123,11 +123,10 @@ class KITTI_Dataset(data.Dataset):
         plane = plane / norm
         return plane
 
-
-    def get_calib(self, idx):
+    def get_calib(self, idx, use_flip=False):
         calib_file = os.path.join(self.calib_dir, '%06d.txt' % idx)
         assert os.path.exists(calib_file)
-        return Calibration(calib_file)
+        return CalibrationAugment(calib_file, use_flip)
 
     def eval(self, results_dir, logger):
         logger.info("==> Loading detections and GTs...")
@@ -163,19 +162,11 @@ class KITTI_Dataset(data.Dataset):
         # data augmentation for image
         center = np.array(img_size) / 2
         aug_scale, crop_size = 1.0, img_size
-        random_crop_flag, random_flip_flag = False, False
-        # if self.data_augmentation:  # 训练时为 True
-        # TODO: 编写新的增强方式
-        # if np.random.random() < self.random_flip:
-        #     random_flip_flag = True
-        #     img = img.transpose(Image.FLIP_LEFT_RIGHT)
-
-        # if np.random.random() < self.random_crop:   # 当进行随机裁剪时，不训练 3d 检测部分
-        #     random_crop_flag = True
-        #     aug_scale = np.clip(np.random.randn() * self.scale + 1, 1 - self.scale, 1 + self.scale)
-        #     crop_size = img_size * aug_scale
-        #     center[0] += img_size[0] * np.clip(np.random.randn() * self.shift, -2 * self.shift, 2 * self.shift)
-        #     center[1] += img_size[1] * np.clip(np.random.randn() * self.shift, -2 * self.shift, 2 * self.shift)
+        random_right_flag, random_flip_flag = False, False
+        if self.data_augmentation:  # 训练时为 True
+            if np.random.random() < self.random_flip:
+                random_flip_flag = True
+                img = img.transpose(Image.FLIP_LEFT_RIGHT)
 
         # add affine transformation for 2d images.
         trans, trans_inv = get_affine_transform(center, crop_size, 0, self.resolution, inv=1)
@@ -197,7 +188,7 @@ class KITTI_Dataset(data.Dataset):
 
         #  ============================   get labels   ==============================
         objects = self.get_label(index)
-        calib = self.get_calib(index)
+        calib = self.get_calib(index, use_flip=random_flip_flag)
 
         # computed 3d projected box 如果条件成立，说明不信任 2d bbox，所以将 3d box 投影到图像
         if self.bbox2d_type == 'proj':  # False
@@ -206,7 +197,7 @@ class KITTI_Dataset(data.Dataset):
                                              dtype=np.float32)
                 object.box2d = object.box2d_proj.copy()
 
-        # data augmentation for labels  暂时不使用翻转数据增强
+        # data augmentation for labels
         if random_flip_flag:  # False
             for object in objects:
                 [x1, _, x2, _] = object.box2d
@@ -217,6 +208,7 @@ class KITTI_Dataset(data.Dataset):
                 if object.alpha < -np.pi: object.alpha += 2 * np.pi
                 if object.ry > np.pi:  object.ry -= 2 * np.pi
                 if object.ry < -np.pi: object.ry += 2 * np.pi
+            road[0] = -road[0]      # 地平面 a 值反转
 
         # labels encoding
         heatmap = np.zeros((self.num_classes, features_size[1], features_size[0]), dtype=np.float32)  # C * H * W
@@ -316,7 +308,7 @@ class KITTI_Dataset(data.Dataset):
             cu_cv_fu_fv_tx_ty[i] = np.array([calib.cu, calib.cv, calib.fu, calib.fv, calib.tx, calib.ty], dtype=np.float32)
             ratio[i] = img_size / features_size
             mask_2d[i] = 1
-            mask_3d[i] = 0 if random_crop_flag else 1
+            mask_3d[i] = 1
 
         # collect return data
         inputs = img

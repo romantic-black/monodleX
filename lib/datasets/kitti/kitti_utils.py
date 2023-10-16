@@ -142,6 +142,7 @@ class Calibration(object):
         else:
             calib = calib_file
 
+        self.P3 = calib['P3']
         self.P2 = calib['P2']  # 3 x 4
         self.R0 = calib['R0']  # 3 x 3
         self.V2C = calib['Tr_velo2cam']  # 3 x 4
@@ -293,6 +294,34 @@ class Calibration(object):
             alpha += 2 * np.pi
 
         return alpha
+
+
+class CalibrationAugment(Calibration):
+
+    def __init__(self, calib_file, use_flip=False):
+        self.use_flip = use_flip
+        self.resolution = np.array([1280, 384])
+        if isinstance(calib_file, str):
+            calib = get_calib_from_file(calib_file)
+        else:
+            calib = calib_file
+
+        self.P3 = calib['P3']
+        self.P2 = calib['P2']  # 3 x 4
+
+        self.R0 = calib['R0']  # 3 x 3
+        self.V2C = calib['Tr_velo2cam']  # 3 x 4        # 不使用雷达，所以不处理
+        self.C2V = self.inverse_rigid_trans(self.V2C)
+        if use_flip:
+            self.P2[0, 2] = self.resolution[0] - self.cu
+            self.P2[0, 3] = -self.P2[0, 3]
+
+        self.cu = self.P2[0, 2]
+        self.cv = self.P2[1, 2]
+        self.fu = self.P2[0, 0]
+        self.fv = self.P2[1, 1]
+        self.tx = self.P2[0, 3] / (-self.fu)
+        self.ty = self.P2[1, 3] / (-self.fv)
 
 
 
