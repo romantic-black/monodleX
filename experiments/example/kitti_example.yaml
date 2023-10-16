@@ -2,7 +2,7 @@ random_seed: 444
 
 dataset:
   type: &dataset_type 'KITTI'
-  batch_size: 24
+  batch_size: 40
   use_3d_center: True
   class_merging: False
   use_dontcare: False
@@ -34,7 +34,7 @@ trainer:
   max_epoch: 140
   gpu_ids: 0, 1
   save_frequency: 10 # checkpoint save interval (in epoch)
-  # resume_model: '/root/monodleX/work_dirs/checkpoints/checkpoint_epoch_70.pth'
+  resume_model: '/root/monodleX/work_dirs/checkpoints/checkpoint_epoch_70.pth'
 
 
 tester:

@@ -57,8 +57,8 @@ class Trainer(object):
         else:
             self.gpu_ids = list(map(int, cfg['gpu_ids'].split(",")))
 
-        # self.model = torch.nn.DataParallel(model, device_ids=self.gpu_ids).to(self.device)
-        self.model = model.to(self.device)
+        self.model = torch.nn.DataParallel(model, device_ids=self.gpu_ids).to(self.device)
+        #  self.model = model.to(self.device)
 
 
     def train(self):
