@@ -8,7 +8,7 @@ dataset:
   use_dontcare: False
   bbox2d_type: 'anno'   # 'proj' or 'anno'
   meanshape: False      # use predefined anchor or not
-  writelist: ['Car', 'Pedestrian', 'Cyclist']
+  writelist: ['Car']
   random_flip: 0.5
   random_crop: 0.5
   scale: 0.4
@@ -32,7 +32,7 @@ lr_scheduler:
 
 trainer:
   max_epoch: 140
-  gpu_ids: 0, 1
+  gpu_ids: 0
   save_frequency: 10 # checkpoint save interval (in epoch)
   # resume_model: '/root/monodleX/work_dirs/checkpoints/checkpoint_epoch_70.pth'
 

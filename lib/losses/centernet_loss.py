@@ -87,7 +87,7 @@ def compute_location_loss(input, target):
     u, v = (indices % 320).unsqueeze(1), (indices // 320).unsqueeze(1)
     g_points = (torch.cat((u, v), dim=-1) + offset_3d) * ratio
     proj = img_to_rect(g_points, depth, calib)
-    location = proj + offset_center
+    location = proj     # 直接预测 3d 中心点
     if target['mask_3d'].sum() > 0:
         location_loss = laplacian_aleatoric_uncertainty_loss(location, location_target,
                                                              log_variance, reduction='mean')
