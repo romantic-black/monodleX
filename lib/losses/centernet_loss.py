@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import itertools
 import numpy as np
 from lib.helpers.decode_helper import _transpose_and_gather_feat
 from lib.losses.focal_loss import focal_loss_cornernet
@@ -16,7 +17,7 @@ def compute_centernet3d_loss(input, target):
     edge_fusion = False
     if 'edge_len' in target.keys():
         edge_fusion = True
-
+    point_num = 5
     seg_loss = compute_segmentation_loss(input, target)
     # offset2d_loss = compute_offset2d_loss(input, target, edge_fusion=edge_fusion)
     # size2d_loss = compute_size2d_loss(input, target)
@@ -24,7 +25,10 @@ def compute_centernet3d_loss(input, target):
     # depth_loss = compute_depth_loss(input, target)
     size3d_loss = compute_size3d_loss(input, target)
     heading_loss = compute_heading_loss(input, target)
-    location_loss = compute_location_loss(input, target)
+    location_loss = []
+    for idx in range(point_num):
+        location_loss.append(compute_location_loss(input, target, idx))
+    margin_loss = compute_margin_loss(input, target, point_num)
 
     # statistics
     stats_dict['seg'] = seg_loss.item()
@@ -34,9 +38,13 @@ def compute_centernet3d_loss(input, target):
     # stats_dict['depth'] = depth_loss.item()
     stats_dict['size3d'] = size3d_loss.item()
     stats_dict['heading'] = heading_loss.item()
-    stats_dict['location'] = location_loss.item()
+    stats_dict['margin'] = margin_loss.item()
+
     # seg_loss > depth_loss > size2d_loss > heading_loss > size3d_loss
-    total_loss = seg_loss + size3d_loss + heading_loss + location_loss
+    total_loss = seg_loss + size3d_loss + heading_loss + margin_loss
+    for idx in range(point_num):
+        stats_dict[f'location {idx}'] = location_loss[idx].item()
+        total_loss += location_loss[idx]
     return total_loss, stats_dict
 
 
@@ -75,10 +83,10 @@ def compute_offset2d_loss(input, target, edge_fusion=False):
         return offset2d_loss
 
 
-def compute_location_loss(input, target):
-    offset_3d = extract_input_from_tensor(input['offset_3d'], target['indices'], target['mask_3d'])
+def compute_location_loss(input, target, index):
+    pred = extract_input_from_tensor(input[f'pred_{index}'], target['indices'], target['mask_3d'])
     offset_3d, offset_center, log_variance, depth = \
-        offset_3d[:, 0:2], offset_3d[:, 2:5], offset_3d[:, 5:6], offset_3d[:, 6:7]
+        pred[:, 0:2], pred[:, 2:5], pred[:, 5:6], pred[:, 6:7]
     depth = 1. / (depth.sigmoid() + 1e-6) - 1.
     location_target = extract_target_from_tensor(target['location'], target['mask_3d'])
     calib = extract_target_from_tensor(target['cu_cv_fu_fv_tx_ty'], target['mask_3d'])
@@ -94,6 +102,26 @@ def compute_location_loss(input, target):
     else:
         location_loss = torch.tensor([0.0]).to(g_points.device)
     return location_loss
+
+
+def compute_margin_loss(input, target, point_num):
+    offset = []
+    indices = extract_target_from_tensor(target['indices'], target['mask_3d'])
+    ratio = extract_target_from_tensor(target['ratio'], target['mask_3d'])
+    size_2d = extract_target_from_tensor(target['size_2d'], target['mask_3d']) / ratio
+    threshold = torch.norm(size_2d, dim=-1) / 2
+    # do not consider 0
+    offset.append(torch.zeros_like(size_2d).to(indices.device))
+    for idx in range(1, point_num):
+        offset.append(extract_input_from_tensor(input[f'pred_{idx}'], target['indices'], target['mask_3d'])[:, 0:2])
+    margin_loss = torch.tensor([0.0]).to(indices.device)
+    if target['mask_3d'].sum() > 0:
+        combinations = [list(combo) for combo in itertools.combinations(range(point_num), 2)]
+        for idx0, idx1 in combinations:
+            margin_loss += margin_distanse_loss(offset[idx0], offset[idx1], threshold, reduction='mean')
+    else:
+        margin_loss = torch.tensor([0.0]).to(indices.device)
+    return margin_loss
 
 
 def compute_depth_loss(input, target):
@@ -176,6 +204,12 @@ def compute_heading_loss(input, target):
 
 
 ######################  auxiliary functions #########################
+
+def margin_distanse_loss(input, target, threshold, reduction='mean'):
+    dis = torch.norm(input - target, dim=1)
+    loss = torch.pow(torch.clamp(threshold - dis, min=0), 2)
+    return loss.mean() if reduction == 'mean' else loss.sum()
+
 
 def extract_input_from_tensor(input, ind, mask):
     input = _transpose_and_gather_feat(input, ind)  # B*C*H*W --> B*K*C
